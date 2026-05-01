@@ -1,0 +1,105 @@
+(* Minimal QG.gen for testing *)
+
+KinematicIndices[S] = {};
+KinematicIndices[T] = {Lorentz, Lorentz};
+
+Attributes[MetricTensor] = Attributes[ScalarProduct] = {Orderless};
+
+FourVector/: -FourVector[mom_, mu___] := FourVector[Expand[-mom], mu];
+FourVector[0, ___] = 0;
+
+M$GenericPropagators={
+
+  (* scalar *)
+  AnalyticalPropagator[External][ s1 S[j1, mom] ]== 1,
+  AnalyticalPropagator[Internal][ s1 S[j1, mom] ]==
+    I*FAPropagatorDenominator[mom, Mass[S[j1]]],
+
+  (*tensor propagator:*)
+
+AnalyticalPropagator[External][ s1 T[j1, mom, {li1p1, li1p2}] ] == PolarizationTensor[T[j1], mom, li1p1, li1p2],
+
+(* AnalyticalPropagator[Internal][ s1 T[j1, mom, {li1p1, li1p2} -> {li2p1, li2p2}] ] ==
+I/2*FAPropagatorDenominator[mom,Mass[T[j1]]]*(FAMetricTensor[li1p1,li2p1]*FAMetricTensor[li1p2,li2p2]+FAMetricTensor[li1p1,li2p2]*FAMetricTensor[li1p2,li2p1]-FAMetricTensor[li1p1,li1p2]*FAMetricTensor[li2p1,li2p2]), *)
+
+
+AnalyticalPropagator[Internal][ s1 T[j1, mom, {li1p1, li1p2} -> {li2p1, li2p2}] ] ==
+I*FAPropagatorDenominator[mom,Mass[T[j1]]]*(1/2*(FAMetricTensor[li1p1,li2p1]*FAMetricTensor[li1p2,li2p2]+FAMetricTensor[li1p1,li2p2]*FAMetricTensor[li1p2,li2p1]-FAMetricTensor[li1p1,li1p2]*FAMetricTensor[li2p1,li2p2])-(1-GaugeXi[T[j1]])*FAPropagatorDenominator[mom,Mass[T[j1]]]*(FAMetricTensor[li1p1,li2p1]*FourVector[mom,li1p2]*FourVector[mom,li2p2]+FAMetricTensor[li1p1,li2p2]*FourVector[mom,li1p2]*FourVector[mom,li2p1]+FAMetricTensor[li1p2,li2p1]*FourVector[mom,li1p1]*FourVector[mom,li2p2]+FAMetricTensor[li1p2,li2p2]*FourVector[mom,li1p1]*FourVector[mom,li2p1]))
+
+};
+L1 = Symbol["L1"];
+
+M$GenericCouplings = {
+
+  (* minimal T-S-S: 3 structures (momentum, swapped momentum, metric) *)
+  AnalyticalCoupling[
+    s1 T[j1, mom1, {li1, li2}],
+    s2 S[j2, mom2],
+    s3 S[j3, mom3]
+  ]==
+    G[1][s1 T[j1], s2 S[j2], s3 S[j3]] .
+    {FourVector[mom2, li2]FourVector[mom3, li1], FourVector[mom3, li2]FourVector[mom2, li1], MetricTensor[li1 ,li2 ]ScalarProduct[mom2,mom3]},
+
+  (* minimal T-T-S-S: three symmetric metric structures *)
+  AnalyticalCoupling[
+    s1 T[j1, mom1, {li1a, li1b}],
+    s2 T[j2, mom2, {li2a, li2b}],
+    s3 S[j3, mom3],
+    s4 S[j4, mom4]
+  ]==
+    G[1][s1 T[j1], s2 T[j2], s3 S[j3], s4 S[j4]] .
+    {L1},
+
+ (* minimal T-T-T: three symmetric metric structures *)
+  AnalyticalCoupling[
+    s1 T[j1, mom1, {li1a, li1b}],
+    s2 T[j2, mom2, {li2a, li2b}],
+    s3 T[j3, mom3, {li3a, li3b}]
+  ]==
+    G[1][s1 T[j1], s2 T[j2], s3 T[j3]] .
+    {L1}
+
+};
+
+	(* LastGenericRules: the very last rules that are applied to an
+	   amplitude before it is returned by CreateFeynAmp. *)
+
+M$LastGenericRules = {
+  PolarizationVector[p_, _. mom:FourMomentum[Outgoing, _], li_] :>
+    Conjugate[PolarizationVector][p, mom, li]
+}
+	(* cosmetics: *)
+
+	(*  left spinor in chain + mom incoming -> ar v
+	    left spinor in chain + mom outgoing -> ar u
+	   right spinor in chain + mom incoming -> u
+	   right spinor in chain + mom outgoing -> v *)
+Format[
+  FermionChain[
+    NonCommutative[_[s1_. mom1_, mass1_]],
+    r___,
+    NonCommutative[_[s2_. mom2_, mass2_]]] ] :=
+  Overscript[If[FreeQ[mom1, Incoming], "u", "v"], "_"][mom1, mass1] .
+    r . If[FreeQ[mom2, Outgoing], "u", "v"][mom2, mass2]
+
+Format[ DiracSlash ] = "gs"
+
+Format[ DiracMatrix ] = "ga"
+
+Format[ ChiralityProjector[1] ] = SequenceForm["om", Subscript["+"]]
+
+Format[ ChiralityProjector[-1] ] = SequenceForm["om", Subscript["-"]]
+
+Format[ GaugeXi[a_] ] := SequenceForm["xi", Subscript[a]]
+
+Format[ PolarizationVector ] = "ep"
+
+Unprotect[Conjugate];
+Format[ Conjugate[a_] ] = SequenceForm[a, Superscript["*"]];
+Protect[Conjugate]
+
+Format[ MetricTensor ] = "g"
+
+Format[ ScalarProduct[a__] ] := Dot[a]
+
+Format[ FourVector[a_, b_] ] := a[b]
